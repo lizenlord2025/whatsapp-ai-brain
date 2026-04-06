@@ -5,25 +5,22 @@ const qrcode = require('qrcode-terminal');
 const { OpenAI } = require('openai');
 const http = require('http');
 
-// 1. Secrets from Render Environment Variables
 const MONGODB_URI = process.env.MONGODB_URI;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const PORT = process.env.PORT || 3000; 
 
-// 2. Initialize the Llama 3.2 Vision Brain
 const openai = new OpenAI({
     baseURL: "https://models.inference.ai.azure.com",
     apiKey: GITHUB_TOKEN
 });
 
-// 3. THE DUMMY SERVER: This keeps Render happy and "Green"
+// The Dummy Server to keep Render alive
 http.createServer((req, res) => {
     res.writeHead(200, {'Content-Type': 'text/plain'});
     res.write('Bot is Online!');
     res.end();
 }).listen(PORT);
 
-// 4. Connect to MongoDB Memory
 mongoose.connect(MONGODB_URI).then(() => {
     console.log('Memory Connected! Starting WhatsApp Brain...');
     const store = new MongoStore({ mongoose: mongoose });
@@ -45,28 +42,31 @@ mongoose.connect(MONGODB_URI).then(() => {
         }
     });
 
-    // 5. THE MAGIC LINK: This creates the small, scannable QR link
     client.on('qr', (qr) => {
         console.log('\n--- SCAN THIS LINK FOR A PERFECT SCAN ---');
         console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
         console.log('-------------------------------------------\n');
-        
-        // Also prints the terminal version just in case
         qrcode.generate(qr, { small: true });
     });
 
-    client.on('ready', () => {
-        console.log('Your WhatsApp Super Brain is now ONLINE and ready for messages!');
+    // --- THE STARTUP NOTIFICATION ---
+    client.on('ready', async () => {
+        console.log('Your WhatsApp Super Brain is now ONLINE!');
+        
+        try {
+            // This finds YOUR specific WhatsApp ID and sends the message
+            const myNumber = client.info.wid._serialized;
+            await client.sendMessage(myNumber, "🚀 *Llama is Online!* \nI'm ready for your Class 9 Physics questions or some Gravity Golf coding logic!");
+        } catch (err) {
+            console.error("Could not send startup message:", err);
+        }
     });
 
-    // 6. The Logic: Handling Messages and Diagrams
     client.on('message', async (msg) => {
-        // Stop the bot from replying to its own messages!
         if (msg.fromMe) return;
 
         try {
             let contentArray = [];
-            
             if (msg.hasMedia) {
                 const media = await msg.downloadMedia();
                 contentArray.push({ type: "image_url", image_url: { url: `data:${media.mimetype};base64,${media.data}` } });
@@ -81,7 +81,6 @@ mongoose.connect(MONGODB_URI).then(() => {
             });
             
             msg.reply(response.choices[0].message.content);
-            
         } catch (error) {
             console.error("AI Brain Error:", error);
         }
