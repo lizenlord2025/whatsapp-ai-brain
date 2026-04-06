@@ -1,16 +1,33 @@
-# Use the official Puppeteer image which has Chrome and Linux libraries pre-installed
-FROM ghcr.io/puppeteer/puppeteer:latest
+# Use a lightweight Node.js Linux environment
+FROM node:20-bullseye-slim
 
-# Switch to root to ensure we have permissions to read/write the Mongo auth files
-USER root
+# Explicitly install Chromium and its required graphical libraries
+RUN apt-get update && apt-get install -y \
+    chromium \
+    libglib2.0-0 \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libxshmfence1 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copy package files and install your node modules
+# Tell Puppeteer to skip downloading its own Chrome, we will use the one we just installed
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
 COPY package*.json ./
 RUN npm install
 
-# Copy all your javascript files
 COPY . .
 
-# Start the bot
 CMD ["node", "index.js"]
