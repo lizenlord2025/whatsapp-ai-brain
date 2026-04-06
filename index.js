@@ -20,22 +20,20 @@ mongoose.connect(MONGODB_URI).then(() => {
     
     const store = new MongoStore({ mongoose: mongoose });
 
-    // 4. Configure the WhatsApp Client
+    // Configure the WhatsApp Client
     const client = new Client({
         authStrategy: new RemoteAuth({
             store: store,
-            backupSyncIntervalMs: 300000 // Saves your login every 5 minutes
+            backupSyncIntervalMs: 300000
         }),
-        // Low-RAM flags for Render's Free Tier
         puppeteer: {
             headless: true,
+            // We tell the bot exactly where we installed Chrome
+            executablePath: './.cache/chrome/linux-146.0.7680.153/chrome-linux64/chrome',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
                 '--disable-gpu'
             ]
         }
