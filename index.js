@@ -13,7 +13,6 @@ const openai = new OpenAI({
     apiKey: GITHUB_TOKEN
 });
 
-// Variable to store the latest QR code state
 let currentQR = ""; 
 
 // Web Server: Displays the QR code in a browser tab
@@ -23,7 +22,6 @@ http.createServer((req, res) => {
     if (currentQR === "CONNECTED") {
         res.end(`<h2 style="font-family: sans-serif; text-align: center; margin-top: 20vh;">✅ Llama Bot is Active and Connected!</h2>`);
     } else if (currentQR) {
-        // Renders the QR code on the client's browser using a CDN to save server RAM
         res.end(`
             <html>
             <head>
@@ -51,7 +49,7 @@ http.createServer((req, res) => {
 }).listen(PORT);
 
 mongoose.connect(MONGODB_URI).then(async () => {
-    console.log('Database Connected. Generating QR Code...');
+    console.log('Database Connected. Starting WhatsApp Client...');
     const store = new MongoStore({ mongoose: mongoose });
 
     const client = new Client({
@@ -69,46 +67,75 @@ mongoose.connect(MONGODB_URI).then(async () => {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process', // Aggressive RAM saving
+                '--single-process', 
                 '--disable-gpu',
                 '--disable-canvas-aa',
                 '--disable-2d-canvas-clip-aa',
                 '--disable-gl-drawing-for-tests',
-                '--disable-extensions', // Extra RAM saving
-                '--mute-audio'          // Extra RAM saving
+                '--disable-extensions', 
+                '--mute-audio'          
             ]
         }
     });
 
     // --- QR CODE LOGIC ---
-    client.on('qr', async (qr) => {
+    client.on('qr', (qr) => {
         console.log('New QR Code ready! Open your Render app URL in a browser tab to scan it.');
-        currentQR = qr; // Pass to web server
+        currentQR = qr; 
     });
 
+    // --- CONNECTION PING ---
     client.on('ready', async () => {
-        console.log('Llama is Online!');
-        currentQR = "CONNECTED"; // Tell the web server to stop showing the QR
+        console.log('WhatsApp Client is Ready!');
+        currentQR = "CONNECTED"; 
+        
         const myId = client.info.wid._serialized;
-        await client.sendMessage(myId, "🚀 *Llama is Online!*");
+        // This instantly messages your "Message Yourself" chat upon a successful start/restart
+        await client.sendMessage(myId, "🟢 *Llama Bot System connected & ready!* Send `!ping` to test.");
     });
 
+    // --- MESSAGE LOGIC ---
     client.on('message_create', async (msg) => {
-        // SECURITY: Only reply if the message was sent BY YOU (!msg.fromMe filters out everyone else)
-        if (!msg.fromMe || !msg.body.toLowerCase().startsWith('!ai')) return;
+        const myId = client.info.wid._serialized;
         
-        try {
-            const cleanText = msg.body.replace(/!ai/i, '').trim();
-            if (!cleanText) return; // Ignore if you just type "!ai" with no prompt
+        // SECURITY: Ensures it's either flagged as 'fromMe' OR strictly matches your own WhatsApp ID
+        const isFromMe = msg.fromMe || msg.from === myId;
+        
+        // Ignore the message completely if it is from anyone else
+        if (!isFromMe) return;
 
-            const response = await openai.chat.completions.create({
-                model: "Llama-3.2-11B-Vision-Instruct",
-                messages: [{ role: "user", content: [{ type: "text", text: cleanText }] }],
-            });
-            await msg.reply(response.choices[0].message.content);
-        } catch (error) {
-            console.error("AI Error:", error);
-            await msg.reply("❌ Error reaching the AI.");
+        // 1. PING COMMAND (No AI required, tests connection instantly)
+        if (msg.body.toLowerCase() === '!ping') {
+            console.log("[DEBUG] Ping command received!");
+            await msg.reply("🏓 Pong! The bot is awake, reading your messages, and ready to use !ai.");
+            return;
+        }
+
+        // 2. AI COMMAND
+        if (msg.body.toLowerCase().startsWith('!ai')) {
+            console.log(`[DEBUG] !ai command detected! Body: ${msg.body}`);
+            
+            try {
+                const cleanText = msg.body.replace(/!ai/i, '').trim();
+                if (!cleanText) {
+                    await msg.reply("You need to ask a question! Example: `!ai How do I improve the UI of PersoTrade?`");
+                    return; 
+                }
+
+                console.log(`[DEBUG] Sending prompt to OpenAI API...`);
+                
+                const response = await openai.chat.completions.create({
+                    model: "Llama-3.2-11B-Vision-Instruct",
+                    messages: [{ role: "user", content: cleanText }],
+                });
+                
+                console.log(`[DEBUG] AI replied successfully! Sending back to WhatsApp.`);
+                await msg.reply(response.choices[0].message.content);
+
+            } catch (error) {
+                console.error("[DEBUG] AI API Error:", error.message || error);
+                await msg.reply(`❌ API Error: ${error.message || "Check Render logs."}`);
+            }
         }
     });
 
