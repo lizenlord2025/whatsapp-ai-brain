@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Tell Puppeteer to skip downloading its own Chrome, we will use the one we just installed
+# Tell Puppeteer to skip downloading its own Chrome, we will use the bulletproof one we just installed
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
