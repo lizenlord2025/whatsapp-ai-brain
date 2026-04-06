@@ -38,17 +38,19 @@ mongoose.connect(MONGODB_URI).then(() => {
             ]
         }
     });
-
-    // 5. QR Code Listener (Watch the Render Logs!)
+// 5. QR Code Listener (Watch the Render Logs!)
     client.on('qr', (qr) => {
         console.log('--- SCAN THE QR CODE BELOW ---');
+        
+        // This is the terminal version (hard to scan)
         qrcode.generate(qr, { small: true });
-    });
 
-    client.on('ready', () => {
-        console.log('Your WhatsApp Super Brain is now ONLINE!');
+        // THE MAGIC LINK: Click this in your Render logs!
+        console.log('\n--- OR OPEN THIS LINK FOR A PERFECT SCAN ---');
+        console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
+        console.log('--------------------------------------------\n');
     });
-
+    
     // 6. The Logic: Handling Messages and Images
     client.on('message', async (msg) => {
         try {
