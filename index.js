@@ -90,7 +90,6 @@ mongoose.connect(MONGODB_URI).then(async () => {
         currentQR = "CONNECTED"; 
         
         const myId = client.info.wid._serialized;
-        // This instantly messages your "Message Yourself" chat upon a successful start/restart
         await client.sendMessage(myId, "🟢 *Llama Bot System connected & ready!* Send `!ping` to test.");
     });
 
@@ -101,10 +100,9 @@ mongoose.connect(MONGODB_URI).then(async () => {
         // SECURITY: Ensures it's either flagged as 'fromMe' OR strictly matches your own WhatsApp ID
         const isFromMe = msg.fromMe || msg.from === myId;
         
-        // Ignore the message completely if it is from anyone else
         if (!isFromMe) return;
 
-        // 1. PING COMMAND (No AI required, tests connection instantly)
+        // 1. PING COMMAND
         if (msg.body.toLowerCase() === '!ping') {
             console.log("[DEBUG] Ping command received!");
             await msg.reply("🏓 Pong! The bot is awake, reading your messages, and ready to use !ai.");
@@ -118,7 +116,7 @@ mongoose.connect(MONGODB_URI).then(async () => {
             try {
                 const cleanText = msg.body.replace(/!ai/i, '').trim();
                 if (!cleanText) {
-                    await msg.reply("You need to ask a question! Example: `!ai How do I improve the UI of PersoTrade?`");
+                    await msg.reply("You need to ask a question! Example: `!ai How do I improve my website?`");
                     return; 
                 }
 
@@ -139,5 +137,11 @@ mongoose.connect(MONGODB_URI).then(async () => {
         }
     });
 
-    client.initialize();
+    // --- CRASH DETECTOR ---
+    // If Puppeteer fails to open Chrome, this will catch it and print the exact reason to your Render Logs.
+    client.initialize().catch(err => {
+        console.error("\n❌❌❌ PUPPETEER CRASH DETECTED ❌❌❌");
+        console.error(err);
+        console.error("❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌\n");
+    });
 });
