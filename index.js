@@ -15,7 +15,7 @@ const openai = new OpenAI({
 
 let currentQR = ""; 
 
-// Web Server
+// Web Server: Displays the QR code in a browser tab
 http.createServer((req, res) => {
     res.writeHead(200, {'Content-Type': 'text/html'});
     
@@ -31,6 +31,7 @@ http.createServer((req, res) => {
             <body style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; background-color: #f0f2f5;">
                 <h2>Scan with WhatsApp to link your bot</h2>
                 <div id="qrcode" style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"></div>
+                <p style="color: #666; margin-top: 20px;">Page auto-refreshes every 15 seconds...</p>
                 <script>
                     new QRCode(document.getElementById("qrcode"), { text: "${currentQR}", width: 256, height: 256 });
                     setTimeout(() => location.reload(), 15000);
@@ -50,12 +51,12 @@ mongoose.connect(MONGODB_URI).then(async () => {
     const client = new Client({
         authStrategy: new RemoteAuth({
             store: store,
-            backupSyncIntervalMs: 600000 
+            backupSyncIntervalMs: 600000 // Save every 10 mins to save RAM
         }),
         puppeteer: {
             headless: true,
-            // Automatically uses the Chrome installed inside the Docker container
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome-stable',
+            // Pointing directly to the bulletproof Chromium installation
+            executablePath: '/usr/bin/chromium', 
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -70,11 +71,13 @@ mongoose.connect(MONGODB_URI).then(async () => {
         }
     });
 
+    // --- QR CODE LOGIC ---
     client.on('qr', (qr) => {
         console.log('New QR Code ready! Open your Render app URL to scan it.');
         currentQR = qr; 
     });
 
+    // --- CONNECTION PING ---
     client.on('ready', async () => {
         console.log('WhatsApp Client is Ready!');
         currentQR = "CONNECTED"; 
@@ -82,17 +85,22 @@ mongoose.connect(MONGODB_URI).then(async () => {
         await client.sendMessage(myId, "🟢 *Llama Bot System connected & ready!* Send `!ping` to test.");
     });
 
+    // --- MESSAGE LOGIC ---
     client.on('message_create', async (msg) => {
         const myId = client.info.wid._serialized;
+        
+        // SECURITY: Ensures it's either flagged as 'fromMe' OR strictly matches your own WhatsApp ID
         const isFromMe = msg.fromMe || msg.from === myId;
         
         if (!isFromMe) return;
 
+        // 1. PING COMMAND
         if (msg.body.toLowerCase() === '!ping') {
-            await msg.reply("🏓 Pong! The bot is awake and running on Docker.");
+            await msg.reply("🏓 Pong! The bot is awake and running smoothly on Docker.");
             return;
         }
 
+        // 2. AI COMMAND
         if (msg.body.toLowerCase().startsWith('!ai')) {
             try {
                 const cleanText = msg.body.replace(/!ai/i, '').trim();
@@ -110,5 +118,10 @@ mongoose.connect(MONGODB_URI).then(async () => {
         }
     });
 
-    client.initialize().catch(console.error);
+    // --- CRASH DETECTOR ---
+    client.initialize().catch(err => {
+        console.error("\n❌❌❌ PUPPETEER CRASH DETECTED ❌❌❌");
+        console.error(err);
+        console.error("❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌\n");
+    });
 });
